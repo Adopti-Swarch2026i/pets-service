@@ -1,44 +1,80 @@
 # Pets Service
 
-Microservicio encargado de la gestión y publicación de mascotas perdidas/encontradas. Construido con FastAPI y estructurado siguiendo principios de **Arquitectura Hexagonal / Capas**.
+Microservicio encargado de la gestión y publicación de reportes de mascotas perdidas y encontradas.
 
-## Requisitos Previos
-
-- Python 3.12+
-- PostgreSQL
-- Credenciales de Firebase Admin SDK (`firebase-config/`)
-
-## Configuración del Entorno
+## Requisitos y Configuración
 
 Configura las siguientes variables de entorno (puedes usar un archivo `.env`):
 
 ```env
-# URL de conexión a la base de datos PostgreSQL
+# Conexión a PostgreSQL
 DATABASE_URL=postgresql://user:password@localhost:5432/pets_db
 
-# Ruta al archivo JSON con las credenciales de Firebase
+# Credenciales de Firebase Admin SDK
 FIREBASE_CREDENTIALS=./firebase-config/serviceAccountKey.json
 ```
 
-## Ejecución Local
+Para ejecutar localmente:
+```bash
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
+*Swagger UI disponible en: `http://localhost:8000/docs`*
 
-1. Instalar dependencias:
-   ```bash
-   pip install -r requirements.txt
-   ```
+---
 
-2. Ejecutar el servidor de desarrollo:
-   ```bash
-   uvicorn app.main:app --reload --port 8000
-   ```
+## Documentación de la API
 
-## Arquitectura (Hexagonal)
+Todas las rutas operan bajo el prefijo `/api/pets`. Los endpoints que requieren autenticación necesitan el header `Authorization: Bearer <Firebase-ID-Token>`.
 
-El servicio está organizado en capas para asegurar el desacoplamiento (SRP, DRY):
+### 1. Obtener Estadísticas
+* **Ruta:** `GET /stats`
+* **Auth:** No
+* **Respuesta:**
+  ```json
+  {
+    "total_reports": 10,
+    "lost": 6,
+    "found": 4
+  }
+  ```
 
-- `api/`: Controladores HTTP (Routers pasivos).
-- `services/`: Lógica de negocio (Reglas y orquestación).
-- `crud/`: Repositorio (Capa de abstracción de datos con SQLAlchemy).
-- `models/` & `schemas/`: Modelos de BD y DTOs (Pydantic).
-- `exceptions/`: Manejo unificado de errores (excepciones de dominio -> respuestas HTTP).
-- `core/`: Configuración y Seguridad (Firebase Auth).
+### 2. Listar Reportes
+* **Ruta:** `GET /`
+* **Auth:** No
+* **Query Params (Opcionales):**
+  * `status` (String): "lost" o "found"
+  * `type` (String): "dog", "cat", etc.
+* **Respuesta:** Lista de objetos `Report`.
+
+### 3. Obtener Reporte por ID
+* **Ruta:** `GET /{id}`
+* **Auth:** No
+* **Respuesta:** Objeto `Report` detallado.
+
+### 4. Crear un Reporte
+* **Ruta:** `POST /`
+* **Auth:** **Sí**
+* **Body (JSON):**
+  ```json
+  {
+    "name": "Firulais",
+    "type": "dog",
+    "breed": "Labrador",
+    "color": "Dorado",
+    "status": "lost",
+    "location": "Parque Central",
+    "description": "Llevaba collar rojo"
+  }
+  ```
+* **Respuesta:** Objeto `Report` creado.
+
+### 5. Actualizar un Reporte
+* **Ruta:** `PUT /{id}`
+* **Auth:** **Sí** (Solo el owner_id original)
+* **Body:** Mismo formato que creación.
+
+### 6. Eliminar un Reporte
+* **Ruta:** `DELETE /{id}`
+* **Auth:** **Sí** (Solo el owner_id original)
+* **Respuesta:** `{"message": "Deleted"}`
