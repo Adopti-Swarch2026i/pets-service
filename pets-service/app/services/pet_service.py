@@ -62,7 +62,7 @@ class PetService:
         self._repository.delete_report(report)
         return {"message": "Deleted"}
 
-    # ── Private helpers (DRY) ────────────────────────────
+    # ── Private helpers ────────────────────────────
 
     def _get_owned_report(self, report_id: int, owner_id: str) -> Report:
         """Centralised guard: fetch report and verify ownership.
