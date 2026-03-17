@@ -21,9 +21,12 @@ class Report(Base):
     __tablename__ = "reports"
 
     id = Column(Integer, primary_key=True, index=True)
-    status = Column(String)  # lost / found
+    status = Column(String)  # lost / found / reunited
     location = Column(String)
+    city = Column(String)
     description = Column(String)
+    owner_name = Column(String)
+    owner_phone = Column(String)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     pet_id = Column(Integer, ForeignKey("pets.id"))
