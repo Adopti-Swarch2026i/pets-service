@@ -10,7 +10,7 @@ from typing import Optional, Dict, List
 from sqlalchemy.orm import Session
 
 from app.crud.pet_repository import PetRepository
-from app.schemas.pet_schema import PetCreate
+from app.schemas.pet_schema import PetCreate, PaginatedReportResponse
 from app.exceptions.pet_exceptions import PetNotFoundError, NotPetOwnerError
 from app.models.pet_model import Report
 
@@ -27,7 +27,13 @@ class PetService:
         total = self._repository.count_all_reports()
         lost = self._repository.count_reports_by_status("lost")
         found = self._repository.count_reports_by_status("found")
-        return {"total_reports": total, "lost": lost, "found": found}
+        reunited = self._repository.count_reports_by_status("reunited")
+        return {
+            "total_reports": total,
+            "lost": lost,
+            "found": found,
+            "reunited": reunited,
+        }
 
     # ── List & Detail ────────────────────────────────────
 
@@ -35,8 +41,25 @@ class PetService:
         self,
         status: Optional[str] = None,
         pet_type: Optional[str] = None,
-    ) -> List[Report]:
-        return self._repository.get_all_reports(status=status, pet_type=pet_type)
+        city: Optional[str] = None,
+        search: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> PaginatedReportResponse:
+        records, total = self._repository.get_all_reports(
+            status=status,
+            pet_type=pet_type,
+            city=city,
+            search=search,
+            page=page,
+            page_size=page_size,
+        )
+        return PaginatedReportResponse(
+            total=total,
+            page=page,
+            page_size=page_size,
+            results=records,
+        )
 
     def get_report(self, report_id: int) -> Report:
         report = self._repository.get_report_by_id(report_id)
