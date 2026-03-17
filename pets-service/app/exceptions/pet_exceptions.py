@@ -34,3 +34,10 @@ class InvalidTokenError(PetServiceError):
 
     def __init__(self, detail: str = "Invalid or missing authentication token"):
         super().__init__(detail)
+
+
+class ImageUploadError(PetServiceError):
+    """Raised when an image upload fails (size, format, or provider error)."""
+
+    def __init__(self, detail: str = "Image upload failed"):
+        super().__init__(detail)
