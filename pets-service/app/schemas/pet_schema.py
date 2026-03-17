@@ -13,7 +13,10 @@ class PetBase(BaseModel):
 class PetCreate(PetBase):
     status: str
     location: str
+    city: str
     description: str
+    owner_name: Optional[str] = None
+    owner_phone: Optional[str] = None
 
 
 class PetResponse(PetBase):
@@ -27,9 +30,20 @@ class ReportResponse(BaseModel):
     id: int
     status: str
     location: str
+    city: str
     description: str
+    owner_name: Optional[str] = None
+    owner_phone: Optional[str] = None
+    owner_id: str
     created_at: datetime
     pet: PetResponse
 
     class Config:
         from_attributes = True
+
+
+class PaginatedReportResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    results: list[ReportResponse]
