@@ -17,10 +17,12 @@ class PetCreate(PetBase):
     description: str
     owner_name: Optional[str] = None
     owner_phone: Optional[str] = None
+    image_url: Optional[str] = None
 
 
 class PetResponse(PetBase):
     id: int
+    image_url: Optional[str] = None
 
     class Config:
         from_attributes = True

@@ -12,11 +12,12 @@ services:
   pets-service:
     build: ./pets-service
     container_name: pets-service
+    env_file:
+      - ./pets-service/.env
     depends_on:
       - postgres
     environment:
       - DATABASE_URL=postgresql://postgres:password@postgres:5432/petsdb
-      - FIREBASE_CREDENTIALS=/firebase-config/firebase-service-account.json
     volumes:
       - ./firebase-config:/firebase-config
     ports:

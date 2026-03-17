@@ -13,6 +13,7 @@ class Pet(Base):
     type = Column(String)  # dog, cat, etc
     breed = Column(String)
     color = Column(String)
+    image_url = Column(String, nullable=True)
 
     reports = relationship("Report", back_populates="pet")
 

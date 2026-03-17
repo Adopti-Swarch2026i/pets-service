@@ -72,6 +72,7 @@ class PetRepository:
             type=data.type,
             breed=data.breed,
             color=data.color,
+            image_url=data.image_url,
         )
         self._db.add(new_pet)
         self._db.flush()  # get new_pet.id without committing

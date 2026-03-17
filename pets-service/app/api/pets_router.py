@@ -6,7 +6,7 @@ It simply receives HTTP requests, delegates to PetService, and returns
 the result.  All error handling is done by exceptions/error_handlers.py.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import Optional, List, Dict
 
@@ -85,3 +85,21 @@ def delete_pet(
     service: PetService = Depends(_get_service),
 ):
     return service.delete_report(id, user["uid"])
+
+
+@router.post("/upload-image")
+async def upload_image(
+    file: UploadFile = File(...),
+    user=Depends(verify_token),
+    service: PetService = Depends(_get_service),
+):
+    allowed = {"image/jpeg", "image/png", "image/webp"}
+    if file.content_type not in allowed:
+        raise HTTPException(400, "Formato no permitido. Usa JPG, PNG o WEBP.")
+
+    url = service.upload_image(
+        file_content=await file.read(),
+        content_type=file.content_type,
+        owner_id=user["uid"],
+    )
+    return {"image_url": url}
