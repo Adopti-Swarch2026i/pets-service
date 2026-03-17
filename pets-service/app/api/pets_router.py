@@ -12,13 +12,14 @@ from typing import Optional, List, Dict
 
 from app.db.database import get_db
 from app.core.security import verify_token
-from app.schemas.pet_schema import PetCreate, ReportResponse
+from app.schemas.pet_schema import PetCreate, ReportResponse, PaginatedReportResponse
 from app.services.pet_service import PetService
 
 router = APIRouter(prefix="/api/pets", tags=["Pets"])
 
 
 # ── Dependency ───────────────────────────────────────────
+
 
 def _get_service(db: Session = Depends(get_db)) -> PetService:
     """Provides a PetService instance per request via dependency injection."""
@@ -33,13 +34,24 @@ def get_stats(service: PetService = Depends(_get_service)) -> Dict[str, int]:
     return service.get_stats()
 
 
-@router.get("", response_model=List[ReportResponse])
+@router.get("", response_model=PaginatedReportResponse)
 def list_pets(
     status: Optional[str] = None,
     type: Optional[str] = None,
+    city: Optional[str] = None,
+    search: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20,
     service: PetService = Depends(_get_service),
 ):
-    return service.list_reports(status=status, pet_type=type)
+    return service.list_reports(
+        status=status,
+        pet_type=type,
+        city=city,
+        search=search,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @router.get("/{id}", response_model=ReportResponse)
