@@ -6,7 +6,7 @@ It simply receives HTTP requests, delegates to PetService, and returns
 the result.  All error handling is done by exceptions/error_handlers.py.
 """
 
-from fastapi import APIRouter, Depends, UploadFile, File
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from sqlalchemy.orm import Session
 from typing import Optional, List, Dict
 

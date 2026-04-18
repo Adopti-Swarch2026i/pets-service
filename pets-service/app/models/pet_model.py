@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -13,7 +13,8 @@ class Pet(Base):
     type = Column(String)  # dog, cat, etc
     breed = Column(String)
     color = Column(String)
-    image_url = Column(String, nullable=True)
+    age = Column(String, nullable=True)
+    image_urls = Column(JSON, nullable=True, default=list)
 
     reports = relationship("Report", back_populates="pet")
 

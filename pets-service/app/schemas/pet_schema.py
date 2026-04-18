@@ -1,5 +1,5 @@
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Optional, List
 from datetime import datetime
 
 
@@ -8,6 +8,7 @@ class PetBase(BaseModel):
     type: str
     breed: Optional[str] = None
     color: Optional[str] = None
+    age: Optional[str] = None
 
 
 class PetCreate(PetBase):
@@ -15,14 +16,13 @@ class PetCreate(PetBase):
     location: str
     city: str
     description: str
-    owner_name: Optional[str] = None
     owner_phone: Optional[str] = None
-    image_url: Optional[str] = None
+    image_urls: List[str] = Field(default_factory=list)
 
 
 class PetResponse(PetBase):
     id: int
-    image_url: Optional[str] = None
+    image_urls: List[str] = Field(default_factory=list)
 
     class Config:
         from_attributes = True

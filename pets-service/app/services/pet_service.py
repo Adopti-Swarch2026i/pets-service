@@ -5,18 +5,23 @@ Consumes the PetRepository for data access, enforces domain rules,
 and raises domain exceptions (never HTTPException).
 """
 
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Iterable
 import cloudinary.uploader
 
 from sqlalchemy.orm import Session
+from firebase_admin import auth as fb_auth
 
 from app.crud.pet_repository import PetRepository
-from app.schemas.pet_schema import PetCreate, PaginatedReportResponse
+from app.schemas.pet_schema import (
+    PetCreate,
+    PetResponse,
+    ReportResponse,
+    PaginatedReportResponse,
+)
 from app.exceptions.pet_exceptions import (
     ImageUploadError,
     PetNotFoundError,
     NotPetOwnerError,
-    ImageUploadError,
 )
 from app.models.pet_model import Report
 
@@ -82,29 +87,41 @@ class PetService:
             page=page,
             page_size=page_size,
         )
+        names = self._resolve_names_bulk(r.owner_id for r in records)
+        results = [
+            self._to_response(r, names.get(r.owner_id, r.owner_id))
+            for r in records
+        ]
         return PaginatedReportResponse(
             total=total,
             page=page,
             page_size=page_size,
-            results=records,
+            results=results,
         )
 
-    def get_report(self, report_id: int) -> Report:
+    def get_report(self, report_id: int) -> ReportResponse:
         report = self._repository.get_report_by_id(report_id)
         if not report:
             raise PetNotFoundError(f"Report with id {report_id} not found")
-        return report
+        name = self._resolve_name(report.owner_id)
+        return self._to_response(report, name)
 
     # ── Create ───────────────────────────────────────────
 
-    def create_report(self, data: PetCreate, owner_id: str) -> Report:
-        return self._repository.create_pet_and_report(data, owner_id)
+    def create_report(self, data: PetCreate, owner_id: str) -> ReportResponse:
+        report = self._repository.create_pet_and_report(data, owner_id)
+        name = self._resolve_name(owner_id)
+        return self._to_response(report, name)
 
     # ── Update ───────────────────────────────────────────
 
-    def update_report(self, report_id: int, data: PetCreate, owner_id: str) -> Report:
+    def update_report(
+        self, report_id: int, data: PetCreate, owner_id: str
+    ) -> ReportResponse:
         report = self._get_owned_report(report_id, owner_id)
-        return self._repository.update_report(report, data)
+        updated = self._repository.update_report(report, data)
+        name = self._resolve_name(owner_id)
+        return self._to_response(updated, name)
 
     # ── Delete ───────────────────────────────────────────
 
@@ -116,14 +133,65 @@ class PetService:
     # ── Private helpers ────────────────────────────
 
     def _get_owned_report(self, report_id: int, owner_id: str) -> Report:
-        """Centralised guard: fetch report and verify ownership.
-
-        Eliminates the duplicated not-found + forbidden checks
-        that were previously in update_pet and delete_pet.
-        """
+        """Centralised guard: fetch report and verify ownership."""
         report = self._repository.get_report_by_id(report_id)
         if not report:
             raise PetNotFoundError(f"Report with id {report_id} not found")
         if report.owner_id != owner_id:
             raise NotPetOwnerError()
         return report
+
+    def _resolve_name(self, uid: str) -> str:
+        """Resolve a Firebase UID to a human-readable name.
+
+        Falls back to email and then UID if the user has no display name
+        or cannot be fetched.
+        """
+        try:
+            user = fb_auth.get_user(uid)
+            return user.display_name or user.email or uid
+        except Exception:
+            return uid
+
+    def _resolve_names_bulk(self, uids: Iterable[str]) -> Dict[str, str]:
+        """Batch-resolve Firebase UIDs via get_users (avoids N calls)."""
+        unique = {u for u in uids if u}
+        if not unique:
+            return {}
+        try:
+            identifiers = [fb_auth.UidIdentifier(u) for u in unique]
+            result = fb_auth.get_users(identifiers)
+            names: Dict[str, str] = {}
+            for user in result.users:
+                names[user.uid] = user.display_name or user.email or user.uid
+            for nf in result.not_found:
+                uid = getattr(nf, "uid", None)
+                if uid:
+                    names[uid] = uid
+            for uid in unique:
+                names.setdefault(uid, uid)
+            return names
+        except Exception:
+            return {uid: uid for uid in unique}
+
+    def _to_response(self, report: Report, owner_name: str) -> ReportResponse:
+        return ReportResponse(
+            id=report.id,
+            status=report.status,
+            location=report.location,
+            city=report.city,
+            description=report.description,
+            owner_name=owner_name,
+            owner_phone=report.owner_phone,
+            owner_id=report.owner_id,
+            created_at=report.created_at,
+            pet=PetResponse(
+                id=report.pet.id,
+                name=report.pet.name,
+                type=report.pet.type,
+                breed=report.pet.breed,
+                color=report.pet.color,
+                age=report.pet.age,
+                image_urls=list(report.pet.image_urls or []),
+            ),
+        )

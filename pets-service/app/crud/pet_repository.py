@@ -8,7 +8,7 @@ completely decoupled from SQLAlchemy.
 
 from typing import Optional, List, Tuple
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.pet_model import Pet, Report
 from app.schemas.pet_schema import PetCreate
@@ -37,7 +37,7 @@ class PetRepository:
         page: int = 1,
         page_size: int = 20,
     ) -> Tuple[List[Report], int]:
-        query = self._db.query(Report).join(Pet)
+        query = self._db.query(Report).options(joinedload(Report.pet)).join(Pet)
 
         if status:
             query = query.filter(Report.status == status)
@@ -61,7 +61,12 @@ class PetRepository:
         return records, total
 
     def get_report_by_id(self, report_id: int) -> Optional[Report]:
-        return self._db.query(Report).filter(Report.id == report_id).first()
+        return (
+            self._db.query(Report)
+            .options(joinedload(Report.pet))
+            .filter(Report.id == report_id)
+            .first()
+        )
 
     # ── Mutations ────────────────────────────────────────
 
@@ -72,7 +77,8 @@ class PetRepository:
             type=data.type,
             breed=data.breed,
             color=data.color,
-            image_url=data.image_url,
+            age=data.age,
+            image_urls=list(data.image_urls or []),
         )
         self._db.add(new_pet)
         self._db.flush()  # get new_pet.id without committing
@@ -82,7 +88,6 @@ class PetRepository:
             location=data.location,
             city=data.city,
             description=data.description,
-            owner_name=data.owner_name,
             owner_phone=data.owner_phone,
             pet_id=new_pet.id,
             owner_id=owner_id,
@@ -98,8 +103,17 @@ class PetRepository:
         report.location = data.location
         report.city = data.city
         report.description = data.description
-        report.owner_name = data.owner_name
         report.owner_phone = data.owner_phone
+
+        pet = report.pet
+        pet.name = data.name
+        pet.type = data.type
+        pet.breed = data.breed
+        pet.color = data.color
+        pet.age = data.age
+        if data.image_urls is not None:
+            pet.image_urls = list(data.image_urls)
+
         self._db.commit()
         self._db.refresh(report)
         return report

@@ -1,5 +1,12 @@
-test.txt
+# Variables de entorno
+.env
+.env.local
 
-chat-service 
-frontend
-test.txt
+# Python
+__pycache__/
+*.py[oc]
+.venv/
+
+# OS
+.DS_Store
+Thumbs.db
