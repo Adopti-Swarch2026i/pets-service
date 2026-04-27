@@ -6,6 +6,7 @@ and raises domain exceptions (never HTTPException).
 """
 
 from typing import Optional, Dict, List, Iterable
+from datetime import datetime, timezone
 import cloudinary.uploader
 
 from sqlalchemy.orm import Session
@@ -24,6 +25,7 @@ from app.exceptions.pet_exceptions import (
     NotPetOwnerError,
 )
 from app.models.pet_model import Report
+from app.messaging.publisher import get_publisher
 
 
 MAX_SIZE_MB = 5
@@ -111,6 +113,19 @@ class PetService:
     def create_report(self, data: PetCreate, owner_id: str) -> ReportResponse:
         report = self._repository.create_pet_and_report(data, owner_id)
         name = self._resolve_name(owner_id)
+
+        get_publisher().publish("pet.report.created", {
+            "petId": report.pet.id,
+            "reportId": report.id,
+            "ownerId": owner_id,
+            "type": report.pet.type,
+            "breed": report.pet.breed,
+            "color": report.pet.color,
+            "status": report.status,
+            "city": report.city,
+            "createdAt": report.created_at.isoformat(),
+        })
+
         return self._to_response(report, name)
 
     # ── Update ───────────────────────────────────────────
@@ -119,8 +134,25 @@ class PetService:
         self, report_id: int, data: PetCreate, owner_id: str
     ) -> ReportResponse:
         report = self._get_owned_report(report_id, owner_id)
+        old_status = report.status
         updated = self._repository.update_report(report, data)
         name = self._resolve_name(owner_id)
+
+        if updated.status == "reunited" and old_status != "reunited":
+            get_publisher().publish("pet.report.reunited", {
+                "petId": updated.pet.id,
+                "reportId": updated.id,
+                "ownerId": owner_id,
+                "reunitedAt": datetime.now(timezone.utc).isoformat(),
+            })
+        else:
+            get_publisher().publish("pet.report.updated", {
+                "petId": updated.pet.id,
+                "reportId": updated.id,
+                "status": updated.status,
+                "updatedAt": datetime.now(timezone.utc).isoformat(),
+            })
+
         return self._to_response(updated, name)
 
     # ── Delete ───────────────────────────────────────────

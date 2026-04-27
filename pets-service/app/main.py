@@ -18,6 +18,7 @@ from app.exceptions.error_handlers import (
     invalid_token_handler,
     image_upload_handler,
 )
+from app.messaging.publisher import get_publisher, close_publisher
 
 app = FastAPI(title="Pets Service")
 
@@ -42,6 +43,12 @@ app.add_middleware(
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
+    get_publisher()  # initialize RabbitMQ connection
+
+
+@app.on_event("shutdown")
+def on_shutdown():
+    close_publisher()
 
 
 # ── Register global exception handlers ───────────────────
