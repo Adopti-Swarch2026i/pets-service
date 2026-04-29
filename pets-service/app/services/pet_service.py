@@ -134,26 +134,55 @@ class PetService:
         self, report_id: int, data: PetCreate, owner_id: str
     ) -> ReportResponse:
         report = self._get_owned_report(report_id, owner_id)
-        old_status = report.status
-        updated = self._repository.update_report(report, data)
-        name = self._resolve_name(owner_id)
 
-        if updated.status == "reunited" and old_status != "reunited":
-            get_publisher().publish("pet.report.reunited", {
+        old_snapshot = self._snapshot(report)
+        updated = self._repository.update_report(report, data)
+        new_snapshot = self._snapshot(updated)
+
+        changed_fields = sorted(
+            field
+            for field, old_value in old_snapshot.items()
+            if new_snapshot[field] != old_value
+        )
+
+        name = self._resolve_name(owner_id)
+        publisher = get_publisher()
+
+        # Reunited tiene prioridad: dispara su propio evento aunque otros
+        # campos también hayan cambiado en el mismo update.
+        if updated.status == "reunited" and old_snapshot["status"] != "reunited":
+            publisher.publish("pet.report.reunited", {
                 "petId": updated.pet.id,
                 "reportId": updated.id,
                 "ownerId": owner_id,
                 "reunitedAt": datetime.now(timezone.utc).isoformat(),
             })
-        else:
-            get_publisher().publish("pet.report.updated", {
+        elif changed_fields:
+            publisher.publish("pet.report.updated", {
                 "petId": updated.pet.id,
                 "reportId": updated.id,
-                "status": updated.status,
+                "changedFields": changed_fields,
                 "updatedAt": datetime.now(timezone.utc).isoformat(),
             })
 
         return self._to_response(updated, name)
+
+    @staticmethod
+    def _snapshot(report: Report) -> Dict[str, object]:
+        """Captura los campos relevantes para detectar cambios."""
+        return {
+            "status": report.status,
+            "location": report.location,
+            "city": report.city,
+            "description": report.description,
+            "owner_phone": report.owner_phone,
+            "name": report.pet.name,
+            "type": report.pet.type,
+            "breed": report.pet.breed,
+            "color": report.pet.color,
+            "age": report.pet.age,
+            "image_urls": tuple(report.pet.image_urls or []),
+        }
 
     # ── Delete ───────────────────────────────────────────
 

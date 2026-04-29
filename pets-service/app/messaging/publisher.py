@@ -1,16 +1,25 @@
 """
 RabbitMQ event publisher for pets-service.
 
-Publishes domain events to the 'adopti.events' topic exchange
-so that other services (notification, matching) can react.
+Publishes domain events to the 'adopti.events' topic exchange so other
+services (notification, matching) can react.
+
+Convención (sección 7.3 de p2_plan.md):
+  - El payload del mensaje es directamente el `data` del evento (no un
+    envelope), para que los consumers puedan deserializar al schema del
+    contrato sin desempacar.
+  - `eventId` (UUID v4) y `eventTimestamp` (ISO 8601) viajan en los
+    headers AMQP, no en el body.
+  - `eventId` también se duplica en `message_id` y `eventTimestamp` en
+    `timestamp` para herramientas que inspeccionan propiedades estándar.
 """
 
 import json
-import os
 import logging
+import os
 from datetime import datetime, timezone
-from uuid import uuid4
 from typing import Any, Dict, Optional
+from uuid import uuid4
 
 import pika
 
@@ -20,14 +29,17 @@ EXCHANGE_NAME = "adopti.events"
 
 
 class EventPublisher:
-    """Synchronous RabbitMQ publisher using pika."""
+    """Synchronous RabbitMQ publisher (pika)."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._connection: Optional[pika.BlockingConnection] = None
-        self._channel: Optional[pika.channel.Channel] = None
+        self._channel: Optional[pika.adapters.blocking_connection.BlockingChannel] = None
 
-    def connect(self):
-        url = os.getenv("RABBITMQ_URL", "amqp://adopti:rabbitmq_secret@localhost:5672/")
+    def connect(self) -> None:
+        url = os.getenv(
+            "RABBITMQ_URL",
+            "amqp://adopti:rabbitmq_secret@localhost:5672/",
+        )
         try:
             params = pika.URLParameters(url)
             params.heartbeat = 600
@@ -39,13 +51,13 @@ class EventPublisher:
                 exchange_type="topic",
                 durable=True,
             )
-            logger.info("Connected to RabbitMQ and declared exchange '%s'", EXCHANGE_NAME)
+            logger.info("Connected to RabbitMQ; exchange '%s' declared", EXCHANGE_NAME)
         except Exception:
             logger.exception("Failed to connect to RabbitMQ")
             self._connection = None
             self._channel = None
 
-    def publish(self, routing_key: str, payload: Dict[str, Any]):
+    def publish(self, routing_key: str, payload: Dict[str, Any]) -> None:
         if self._channel is None or self._connection is None or self._connection.is_closed:
             self.connect()
 
@@ -53,36 +65,44 @@ class EventPublisher:
             logger.warning("RabbitMQ unavailable — dropping event %s", routing_key)
             return
 
-        message = {
-            "eventId": str(uuid4()),
-            "eventTimestamp": datetime.now(timezone.utc).isoformat(),
-            "routingKey": routing_key,
-            "data": payload,
-        }
+        event_id = str(uuid4())
+        now = datetime.now(timezone.utc)
+        event_timestamp = now.isoformat()
+
+        properties = pika.BasicProperties(
+            delivery_mode=2,  # persistent
+            content_type="application/json",
+            content_encoding="utf-8",
+            message_id=event_id,
+            timestamp=int(now.timestamp()),
+            headers={
+                "eventId": event_id,
+                "eventTimestamp": event_timestamp,
+            },
+        )
 
         try:
             self._channel.basic_publish(
                 exchange=EXCHANGE_NAME,
                 routing_key=routing_key,
-                body=json.dumps(message, default=str).encode("utf-8"),
-                properties=pika.BasicProperties(
-                    delivery_mode=2,  # persistent
-                    content_type="application/json",
-                ),
+                body=json.dumps(payload, default=str).encode("utf-8"),
+                properties=properties,
             )
-            logger.info("Published event %s (id=%s)", routing_key, message["eventId"])
+            logger.info("Published event %s (id=%s)", routing_key, event_id)
         except Exception:
             logger.exception("Failed to publish event %s", routing_key)
             self._connection = None
             self._channel = None
 
-    def close(self):
+    def close(self) -> None:
         if self._connection and not self._connection.is_closed:
-            self._connection.close()
-            logger.info("RabbitMQ connection closed")
+            try:
+                self._connection.close()
+                logger.info("RabbitMQ connection closed")
+            except Exception:
+                logger.warning("Error while closing RabbitMQ connection", exc_info=True)
 
 
-# Singleton instance
 _publisher: Optional[EventPublisher] = None
 
 
@@ -94,8 +114,8 @@ def get_publisher() -> EventPublisher:
     return _publisher
 
 
-def close_publisher():
+def close_publisher() -> None:
     global _publisher
-    if _publisher:
+    if _publisher is not None:
         _publisher.close()
         _publisher = None
