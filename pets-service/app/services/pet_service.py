@@ -5,9 +5,8 @@ Consumes the PetRepository for data access, enforces domain rules,
 and raises domain exceptions (never HTTPException).
 """
 
-from typing import Optional, Dict, List, Iterable
+from typing import Optional, Dict, Iterable
 from datetime import datetime, timezone
-import cloudinary.uploader
 
 from sqlalchemy.orm import Session
 from firebase_admin import auth as fb_auth
@@ -20,15 +19,11 @@ from app.schemas.pet_schema import (
     PaginatedReportResponse,
 )
 from app.exceptions.pet_exceptions import (
-    ImageUploadError,
     PetNotFoundError,
     NotPetOwnerError,
 )
 from app.models.pet_model import Report
 from app.messaging.publisher import get_publisher
-
-
-MAX_SIZE_MB = 5
 
 
 class PetService:
@@ -50,25 +45,6 @@ class PetService:
             "found": found,
             "reunited": reunited,
         }
-
-    # -- Upload images --
-    def upload_image(
-        self, file_content: bytes, content_type: str, owner_id: str
-    ) -> str:
-        if len(file_content) > MAX_SIZE_MB * 1024 * 1024:
-            raise ImageUploadError(f"File exceeds the {MAX_SIZE_MB}MB limit.")
-
-        try:
-            result = cloudinary.uploader.upload(
-                file_content,
-                folder=f"pets/{owner_id}",
-                allowed_formats=["jpg", "jpeg", "png", "webp"],
-                transformation={"quality": "auto", "fetch_format": "auto"},
-            )
-        except Exception as e:
-            raise ImageUploadError(f"Could not upload image: {str(e)}")
-
-        return result["secure_url"]
 
     # ── List & Detail ────────────────────────────────────
 

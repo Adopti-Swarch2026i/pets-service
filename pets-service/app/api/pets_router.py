@@ -6,9 +6,9 @@ It simply receives HTTP requests, delegates to PetService, and returns
 the result.  All error handling is done by exceptions/error_handlers.py.
 """
 
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import Optional, List, Dict
+from typing import Optional, Dict
 
 from app.db.database import get_db
 from app.core.security import verify_token
@@ -87,19 +87,23 @@ def delete_pet(
     return service.delete_report(id, user["uid"])
 
 
-@router.post("/upload-image")
-async def upload_image(
-    file: UploadFile = File(...),
-    user=Depends(verify_token),
-    service: PetService = Depends(_get_service),
-):
-    allowed = {"image/jpeg", "image/png", "image/webp"}
-    if file.content_type not in allowed:
-        raise HTTPException(400, "Formato no permitido. Usa JPG, PNG o WEBP.")
-
-    url = service.upload_image(
-        file_content=await file.read(),
-        content_type=file.content_type,
-        owner_id=user["uid"],
+@router.api_route(
+    "/upload-image",
+    methods=["POST", "PUT", "PATCH"],
+    deprecated=True,
+    summary="DEPRECATED — usar POST /api/media/upload",
+    description=(
+        "Este endpoint fue reemplazado por el `media-service`. "
+        "Los nuevos clientes deben subir imágenes a `POST /api/media/upload` "
+        "(vía gateway). Este endpoint responde 410 Gone."
+    ),
+)
+async def upload_image_deprecated():
+    raise HTTPException(
+        status_code=410,
+        detail={
+            "error": "Gone",
+            "message": "Este endpoint fue removido. Usa POST /api/media/upload (media-service).",
+            "replacement": "/api/media/upload",
+        },
     )
-    return {"image_url": url}
