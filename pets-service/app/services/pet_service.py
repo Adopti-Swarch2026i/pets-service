@@ -164,7 +164,14 @@ class PetService:
 
     def delete_report(self, report_id: int, owner_id: str) -> Dict[str, str]:
         report = self._get_owned_report(report_id, owner_id)
+        pet_id = report.pet.id
         self._repository.delete_report(report)
+        get_publisher().publish("pet.report.deleted", {
+            "petId": pet_id,
+            "reportId": report_id,
+            "ownerId": owner_id,
+            "deletedAt": datetime.now(timezone.utc).isoformat(),
+        })
         return {"message": "Deleted"}
 
     # ── Private helpers ────────────────────────────

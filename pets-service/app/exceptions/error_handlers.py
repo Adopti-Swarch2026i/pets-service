@@ -12,7 +12,6 @@ from app.exceptions.pet_exceptions import (
     PetNotFoundError,
     NotPetOwnerError,
     InvalidTokenError,
-    ImageUploadError,
 )
 
 
@@ -26,7 +25,3 @@ async def not_pet_owner_handler(_request: Request, exc: NotPetOwnerError):
 
 async def invalid_token_handler(_request: Request, exc: InvalidTokenError):
     return JSONResponse(status_code=401, content={"detail": exc.detail})
-
-
-async def image_upload_handler(_request: Request, exc: ImageUploadError):
-    return JSONResponse(status_code=422, content={"detail": exc.detail})

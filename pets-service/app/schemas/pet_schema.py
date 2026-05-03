@@ -1,10 +1,12 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Literal
 from datetime import datetime
 
 
 class PetBase(BaseModel):
     name: str
+    # En entrada (PetCreate) lo restringimos al enum de events.md §4.1; en
+    # respuesta lo dejamos como str libre para no romper datos legacy.
     type: str
     breed: Optional[str] = None
     color: Optional[str] = None
@@ -12,7 +14,8 @@ class PetBase(BaseModel):
 
 
 class PetCreate(PetBase):
-    status: str
+    type: Literal["dog", "cat", "other"]
+    status: Literal["lost", "found", "reunited"]
     location: str
     city: str
     description: str
