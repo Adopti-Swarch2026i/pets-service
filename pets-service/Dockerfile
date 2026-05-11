@@ -10,6 +10,6 @@ RUN uv lock && uv sync --no-dev
 
 COPY ./app ./app
 
-EXPOSE 8000
+EXPOSE 8443
 
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8443", "--ssl-keyfile", "/app/certs/server.key", "--ssl-certfile", "/app/certs/server.crt", "--ssl-ca-certs", "/app/certs/ca.crt", "--ssl-cert-reqs", "2"]
