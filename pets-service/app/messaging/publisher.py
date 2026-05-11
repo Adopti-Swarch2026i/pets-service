@@ -17,6 +17,8 @@ Convención (sección 7.3 de p2_plan.md):
 import json
 import logging
 import os
+import re
+import ssl
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from uuid import uuid4
@@ -26,6 +28,21 @@ import pika
 logger = logging.getLogger(__name__)
 
 EXCHANGE_NAME = "adopti.events"
+
+
+def _sanitize_url(url: str) -> str:
+    """Remove credentials from a URL before logging."""
+    if not url:
+        return url
+    # Replace user:password@ with user:***REDACTED***@
+    return re.sub(r"(://)([^:]+):([^@]+)@", r"\1\2:***REDACTED***@", url)
+
+
+def _sanitize_error_message(message: str) -> str:
+    """Sanitize any error message that might contain URLs with credentials."""
+    if not message:
+        return message
+    return _sanitize_url(message)
 
 
 class EventPublisher:
@@ -44,6 +61,9 @@ class EventPublisher:
             params = pika.URLParameters(url)
             params.heartbeat = 600
             params.blocked_connection_timeout = 300
+            if url.startswith("amqps://"):
+                ssl_context = ssl.create_default_context(cafile="/app/certs/ca.crt")
+                params.ssl_options = pika.SSLOptions(ssl_context)
             self._connection = pika.BlockingConnection(params)
             self._channel = self._connection.channel()
             self._channel.exchange_declare(
@@ -52,8 +72,11 @@ class EventPublisher:
                 durable=True,
             )
             logger.info("Connected to RabbitMQ; exchange '%s' declared", EXCHANGE_NAME)
-        except Exception:
-            logger.exception("Failed to connect to RabbitMQ")
+        except Exception as e:
+            logger.exception(
+                "Failed to connect to RabbitMQ: %s",
+                _sanitize_error_message(str(e)),
+            )
             self._connection = None
             self._channel = None
 
@@ -89,8 +112,12 @@ class EventPublisher:
                 properties=properties,
             )
             logger.info("Published event %s (id=%s)", routing_key, event_id)
-        except Exception:
-            logger.exception("Failed to publish event %s", routing_key)
+        except Exception as e:
+            logger.exception(
+                "Failed to publish event %s: %s",
+                routing_key,
+                _sanitize_error_message(str(e)),
+            )
             self._connection = None
             self._channel = None
 
