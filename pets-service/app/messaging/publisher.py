@@ -55,7 +55,7 @@ class EventPublisher:
     def connect(self) -> None:
         url = os.getenv(
             "RABBITMQ_URL",
-            "amqp://adopti:rabbitmq_secret@localhost:5672/",
+            "amqps://adopti:__RABBITMQ_PASSWORD__@localhost:5671/",
         )
         try:
             params = pika.URLParameters(url)
