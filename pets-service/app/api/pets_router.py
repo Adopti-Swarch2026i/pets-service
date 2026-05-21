@@ -14,6 +14,7 @@ from app.db.database import get_db
 from app.core.security import verify_token
 from app.schemas.pet_schema import PetCreate, ReportResponse, PaginatedReportResponse
 from app.services.pet_service import PetService
+from app.cache import cached, invalidate_cache_pattern
 
 router = APIRouter(prefix="/api/pets", tags=["Pets"])
 
@@ -30,11 +31,20 @@ def _get_service(db: Session = Depends(get_db)) -> PetService:
 
 
 @router.get("/stats")
+@cached(ttl_seconds=30, key_fn=lambda *a, **k: "pets:stats")
 def get_stats(service: PetService = Depends(_get_service)) -> Dict[str, int]:
     return service.get_stats()
 
 
 @router.get("", response_model=PaginatedReportResponse)
+@cached(
+    ttl_seconds=15,
+    key_fn=lambda *a, **k: (
+        f"pets:list:{k.get('status','all')}:{k.get('type','all')}:"
+        f"{k.get('city','all')}:{k.get('search','all')}:"
+        f"{k.get('page',1)}:{k.get('page_size',20)}"
+    ),
+)
 def list_pets(
     status: Optional[str] = None,
     type: Optional[str] = None,
@@ -55,6 +65,7 @@ def list_pets(
 
 
 @router.get("/{id}", response_model=ReportResponse)
+@cached(ttl_seconds=60, key_fn=lambda *a, **k: f"pets:id:{a[0] if a else k.get('id',0)}")
 def get_pet(id: int, service: PetService = Depends(_get_service)):
     return service.get_report(id)
 
@@ -65,7 +76,9 @@ def create_pet(
     user=Depends(verify_token),
     service: PetService = Depends(_get_service),
 ):
-    return service.create_report(pet_data, user["uid"])
+    result = service.create_report(pet_data, user["uid"])
+    invalidate_cache_pattern("pets:*")
+    return result
 
 
 @router.put("/{id}")
@@ -75,7 +88,9 @@ def update_pet(
     user=Depends(verify_token),
     service: PetService = Depends(_get_service),
 ):
-    return service.update_report(id, pet_data, user["uid"])
+    result = service.update_report(id, pet_data, user["uid"])
+    invalidate_cache_pattern("pets:*")
+    return result
 
 
 @router.delete("/{id}")
@@ -84,7 +99,9 @@ def delete_pet(
     user=Depends(verify_token),
     service: PetService = Depends(_get_service),
 ):
-    return service.delete_report(id, user["uid"])
+    result = service.delete_report(id, user["uid"])
+    invalidate_cache_pattern("pets:*")
+    return result
 
 
 @router.api_route(

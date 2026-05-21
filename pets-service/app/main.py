@@ -13,6 +13,7 @@ from app.exceptions.error_handlers import (
     invalid_token_handler,
 )
 from app.messaging.publisher import get_publisher, close_publisher
+from app.messaging.cache_invalidator import start_cache_invalidator, stop_cache_invalidator
 
 app = FastAPI(title="Pets Service")
 
@@ -21,10 +22,12 @@ app = FastAPI(title="Pets Service")
 def on_startup():
     Base.metadata.create_all(bind=engine)
     get_publisher()  # initialize RabbitMQ connection
+    start_cache_invalidator()
 
 
 @app.on_event("shutdown")
 def on_shutdown():
+    stop_cache_invalidator()
     close_publisher()
 
 
