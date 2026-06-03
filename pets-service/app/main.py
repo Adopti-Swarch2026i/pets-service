@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
-from app.db.database import Base, engine
+from sqlalchemy import text
+from app.db.database import Base, engine, write_engine
 from app.api.pets_router import router
 from app.exceptions.pet_exceptions import (
     PetNotFoundError,
@@ -20,7 +21,12 @@ app = FastAPI(title="Pets Service")
 
 @app.on_event("startup")
 def on_startup():
-    Base.metadata.create_all(bind=engine)
+    with write_engine.connect() as conn:
+        conn.execute(text("SELECT pg_advisory_lock(20260601)"))
+        try:
+            Base.metadata.create_all(bind=write_engine)
+        finally:
+            conn.execute(text("SELECT pg_advisory_unlock(20260601)"))
     get_publisher()  # initialize RabbitMQ connection
     start_cache_invalidator()
 

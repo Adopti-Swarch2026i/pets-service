@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import Optional, Dict
 
-from app.db.database import get_db
+from app.db.database import get_db, get_read_db
 from app.core.security import verify_token
 from app.schemas.pet_schema import PetCreate, ReportResponse, PaginatedReportResponse
 from app.services.pet_service import PetService
@@ -27,12 +27,17 @@ def _get_service(db: Session = Depends(get_db)) -> PetService:
     return PetService(db)
 
 
+def _get_read_service(db: Session = Depends(get_read_db)) -> PetService:
+    """PetService bound to read replica for GET endpoints."""
+    return PetService(db)
+
+
 # ── Endpoints ────────────────────────────────────────────
 
 
 @router.get("/stats")
 @cached(ttl_seconds=30, key_fn=lambda *a, **k: "pets:stats")
-def get_stats(service: PetService = Depends(_get_service)) -> Dict[str, int]:
+def get_stats(service: PetService = Depends(_get_read_service)) -> Dict[str, int]:
     return service.get_stats()
 
 
@@ -52,7 +57,7 @@ def list_pets(
     search: Optional[str] = None,
     page: int = 1,
     page_size: int = 20,
-    service: PetService = Depends(_get_service),
+    service: PetService = Depends(_get_read_service),
 ):
     return service.list_reports(
         status=status,
@@ -66,7 +71,7 @@ def list_pets(
 
 @router.get("/{id}", response_model=ReportResponse)
 @cached(ttl_seconds=60, key_fn=lambda *a, **k: f"pets:id:{a[0] if a else k.get('id',0)}")
-def get_pet(id: int, service: PetService = Depends(_get_service)):
+def get_pet(id: int, service: PetService = Depends(_get_read_service)):
     return service.get_report(id)
 
 
