@@ -15,6 +15,7 @@ from app.exceptions.error_handlers import (
 )
 from app.messaging.publisher import get_publisher, close_publisher
 from app.messaging.cache_invalidator import start_cache_invalidator, stop_cache_invalidator
+from app.discovery import register as consul_register, deregister as consul_deregister
 
 app = FastAPI(title="Pets Service")
 
@@ -29,10 +30,12 @@ def on_startup():
             conn.execute(text("SELECT pg_advisory_unlock(20260601)"))
     get_publisher()  # initialize RabbitMQ connection
     start_cache_invalidator()
+    consul_register()
 
 
 @app.on_event("shutdown")
 def on_shutdown():
+    consul_deregister()
     stop_cache_invalidator()
     close_publisher()
 
