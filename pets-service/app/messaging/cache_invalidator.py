@@ -96,10 +96,11 @@ class CacheInvalidator:
                 return
 
             try:
-                client.delete(f"pets:id:{report_id}")
+                keys_to_delete = [f"pets:id:{report_id}", "pets:stats"]
                 list_keys = list(client.scan_iter(match="pets:list:*"))
                 if list_keys:
-                    client.delete(*list_keys)
+                    keys_to_delete.extend(list_keys)
+                client.delete(*keys_to_delete)
                 logger.info(
                     "Invalidated cache for report %s via %s",
                     report_id,

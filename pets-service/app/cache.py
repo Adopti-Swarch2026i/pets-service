@@ -20,7 +20,16 @@ import redis
 
 logger = logging.getLogger(__name__)
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://redis-cache:6379/0")
+REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
+
+
+def _cache_enabled() -> bool:
+    return os.getenv("CACHE_ENABLED", "true").lower() not in {
+        "0",
+        "false",
+        "no",
+        "off",
+    }
 
 
 class _CircuitBreaker:
@@ -108,6 +117,9 @@ def cached(ttl_seconds: int, key_fn: Callable):
     def decorator(func: Callable):
         @wraps(func)
         def wrapper(*args, **kwargs):
+            if not _cache_enabled():
+                return func(*args, **kwargs)
+
             if _circuit_breaker.is_open():
                 return func(*args, **kwargs)
 
